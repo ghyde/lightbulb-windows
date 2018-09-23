@@ -103,6 +103,13 @@
     - instance_loc != 'ec2'
     - windomain.reboot_required
 
+- name: Sleep 120 seconds to wait for DNS config
+  pause:
+    minutes: 2
+  when:
+    - instance_loc != 'ec2'
+    - windomain.reboot_required
+
 - name: Ensure DNS services are started
   win_service:
     name: "{{ item }}"
