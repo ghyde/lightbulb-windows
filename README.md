@@ -8,22 +8,15 @@ These ansible playbooks provision a lab on AWS for use in delivering a workshop 
 * Per-Student Infrastructure
   * An Ansible/Tower control node
   * A Windows Workstation for interacting with the environment
-  * A set of Windows Hosts for running playbooks against
-
-These expect an existing VPC.  In addition, there is no tear-down playbook.  However, just terminating the EC2 instances clears the environment.  
+  * A Windows Hosts for running playbooks against
 
 The client pre-requisite to use this workshop is simply to have an RDP client which can connect to the EC2 Windows Workstation.  All other activities will take place from that jump point.  The workstation has Visual Studio Code, Putty, and Git for Windows.  
 
 ## Usage
 
-This workshop was written in Ansible 2.4 on Fedora 26.  2.3 definitely will not work as there are modules missing.  It is expected you have ansible 2.4 installed.  Also, you need pywinrm for this to work properly.  
+This workshop was written in Ansible 2.5.  2.3 definitely will not work as there are modules missing.  It is expected you have ansible 2.4 installed.  Also, you need pywinrm for this to work properly.  
 
-```
-easy_install pip 
-pip install "pywinrm>=0.2.2"
-```
-
-In addition to this, for AWS you will need boto for communicating.  I don't remember the exact setup as I did it years ago.  I think I just did dnf install python-boto python3-boto.  
+In addition to this, for AWS you will need boto for communicating.  
 
 Then I have something like this: 
 ~/.aws/config
@@ -37,10 +30,7 @@ aws_access_key_id = <your ec2 access key>
 aws_secret_access_key = <your ec2 secret key>
 
 
-NOTE: In Ansible 2.4.0, ec2_win_password will fail with unable to parse key file.  This is because of an issue with Ansible that broke the module.  Fix is committed upstream https://github.com/ansible/ansible/pull/28791.  This should land in 2.4.1.  In the mean time I have manually patched.
-
-
-Beyond that, the main thing that needs to be edited is the *vars/main.yml* file which contains the configuration details specific to your environment.  
+Beyond that, the main thing that needs to be edited is the *vars/main.yml* file which contains the configuration details specific to your environment.  You can instead copy this file to vars/custom.yml and it will use that instead of the main.yml file.
 
 The main configurations to change are as follows:
 
@@ -63,7 +53,7 @@ region: "us-east-1"
 ec2_key_file: "/home/<user>/.ssh/myprivatekey.pem"
 ```
 
-Next we need to create user details.  First is the password set for all users.  This too needs to meet AD restrictions.  Note that a standard AWS account is limited to 20 ec2 instances, so update your quota in advance.  Also note that each student gets 4 machines.  Make certain your VPC is large enough.  
+Next we need to create user details.  First is the password set for all users.  This too needs to meet AD restrictions.  Note that a standard AWS account is limited to 20 ec2 instances, so update your quota in advance.  Also note that each student gets 3 machines.  Make certain your VPC is large enough.  
 
 ```
 # Number of users and prefix for user name
@@ -129,47 +119,11 @@ That's it.  Easy, right ?!?   Now run it (it just executes on localhost):
 ansible-playbook site.yml
 ```
 
-It takes roughly 30 minutes to provision an environment for a single student.  I think a multi-student lab will take similar because of async tasks, but I've not tested as of yet.  
+It takes roughly 30 minutes to 1 hour to provision an environment for a single student.  I think a multi-student lab will take similar because of async tasks, but I've not tested as of yet.  
 
 All inventories will be placed in your local directory executing the playbook.  There are student#-instances.txt for each student there.  Also, there is an instructor-inventory.txt.  The student inventory is also placed on their tower host as /etc/ansible/hosts
 
 ## Connecting to the environment
 
 The workshop has people connect through RDP to the workstation for their lab and then interact with other systems from there.  However, all systems are accessible publicly at the moment, so there is nothing stopping you from connecting directly.  Look in the student#-instances.txt and instructor_inventory.txt files for ip addresses, users, and passwords.
-
-## Building Docs 
-
-I'm using asciidoc/asciidoctor.  I *think* I got these as follows: 
-```
-dnf -y install asciidoc rubygem-asciidoctor rubygem-asciidoctor-pdf
-# I might have done 'gem install asciidoctor'
-```
-
-Build HTML output and PDF as follows: 
-
-```
-cd content/ansible-workshop-windows
-asciidoc -d book -v -o index.html index.adoc
-asciidoctor -b pdf -d book -r asciidoctor-pdf -o aww.pdf index.adoc
-```
-
-## Known Issues
-
-Currently there is an Insecure message with win_ping (and all other windows modules) from the Ansible Tower host, even though 'ansible_winrm_server_cert_validation=ignore' is set in the inventory.  It looks like the below issue, but I can't be certain.  In my testing I was not able to work around it.  It doesn't impact functionality, but does give a lot of warning messages.  If you want to avoid these, here's a hacky way to do it.  
-
-```
-vi /usr/lib/python2.7/site-packages/urllib3/connectionpool.py
-### Comment out this:
-
-#        if not conn.is_verified:
-#            warnings.warn((
-#                'Unverified HTTPS request is being made. '
-#                'Adding certificate verification is strongly advised. See: '
-#                'https://urllib3.readthedocs.io/en/latest/advanced-usage.html'
-#                '#ssl-warnings'),
-#                InsecureRequestWarning)
-
-```
-
-That will suppress the warning message from the source.  I suppose in a non-lab environment, the right way is to implement proper certificates.  
 
